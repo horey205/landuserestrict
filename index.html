@@ -140,9 +140,9 @@
         // Smart Proxy: Auto-detect Environment (Local vs Vercel)
         const proxy = (url) => {
             const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            // Use local Python proxy for development, but call DIRECTLY on Vercel for maximum reliability
-            if (!isLocal) return url; 
-            return `http://localhost:8000/proxy?url=${encodeURIComponent(url)}`;
+            // Use local Python proxy for development, and hardened Node.js proxy for Vercel
+            const proxyBase = isLocal ? 'http://localhost:8000/proxy?url=' : '/api/proxy?url=';
+            return `${proxyBase}${encodeURIComponent(url)}`;
         };
         
         let wfsLayers = [], favorites = [], hoverTimeout, isInsightActive = true;
