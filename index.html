@@ -297,7 +297,7 @@
         map.on('singleclick', async (e) => {
             const coord = ol.proj.toLonLat(e.coordinate);
             selectionLayer.getSource().clear();
-            const res = await fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${coord[0]} ${coord[1]})&crs=EPSG:4326&domain=localhost`));
+            const res = await fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${coord[0]} ${coord[1]})&crs=EPSG:4326&domain=${window.location.hostname}`, true));
             const d = await res.json();
             if(d.response?.status === 'OK' && d.response.result.featureCollection.features.length > 0) {
                 selectionLayer.getSource().addFeatures(new ol.format.GeoJSON().readFeatures(d.response.result.featureCollection));
@@ -311,7 +311,7 @@
                 return; 
             }
             try {
-                const res = await fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${lon} ${lat})&crs=EPSG:4326&domain=localhost`));
+                const res = await fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${lon} ${lat})&crs=EPSG:4326&domain=${window.location.hostname}`, true));
                 const d = await res.json();
                 if (d.response?.status === 'OK' && d.response.result.featureCollection.features.length > 0) {
                     const p = d.response.result.featureCollection.features[0].properties;
