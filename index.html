@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VWORLD PRO 1.5.1 - Stealth Insight</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v9.1.0/ol.css">
+    <script src="https://cdn.jsdelivr.net/npm/ol@v9.1.0/dist/ol.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body { font-family: 'Inter', Pretendard, sans-serif; margin: 0; overflow: hidden; background: #0f172a; color: #1e293b; }
+        #map { width: 100%; height: 100%; background: #f8fafc; cursor: crosshair; }
+        .sidebar { background: #ffffff; border-right: 1px solid #e2e8f0; position: relative; min-width: 250px; max-width: 800px; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 50; }
+        .sidebar.collapsed { transform: translateX(-100%); min-width: 0; }
+        .resizer { width: 6px; cursor: col-resize; background: transparent; transition: background 0.2s; z-index: 40; }
+        .resizer.collapsed { display: none; }
+        .resizer:hover, .resizer.resizing { background: rgba(37, 99, 235, 0.2); }
+        .active-tab { color: #2563eb; font-weight: 800; border-bottom: 4px solid #2563eb; }
+        .sidebar-toggle { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); width: 24px; height: 50px; background: white; border: 1px solid #e2e8f0; border-left: 0; border-radius: 0 12px 12px 0; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #94a3b8; font-weight: 900; box-shadow: 4px 0 10px -2px rgba(0,0,0,0.1); transition: color 0.2s; }
+        .sidebar-toggle:hover { color: #2563eb; }
+        .glass-ui { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid #cbd5e1; }
+        
+        .ol-popup {
+            position: absolute;
+            background: rgba(15, 23, 42, 0.92);
+            backdrop-filter: blur(10px);
+            color: white;
+            padding: 16px 22px;
+            border-radius: 24px;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            bottom: 30px;
+            left: -50%;
+            transform: translateX(-50%);
+            min-width: 240px;
+            pointer-events: none;
+            box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            display: none;
+            transition: opacity 0.2s;
+        }
+        .ol-popup:after {
+            top: 100%;
+            border: solid transparent;
+            content: " ";
+            height: 0; width: 0;
+            position: absolute;
+            pointer-events: none;
+            border-top-color: rgba(15, 23, 42, 0.92);
+            border-width: 10px;
+            left: 50%;
+            margin-left: -10px;
+        }
+    </style>
+</head>
+<body class="flex h-screen overflow-hidden">
+    <div id="popup" class="ol-popup">
+        <div id="popup-content"></div>
+    </div>
+
+    <aside class="sidebar w-[400px] h-full flex flex-col z-20 shadow-2xl">
+        <button onclick="toggleSidebar()" class="sidebar-toggle">◀</button>
+        <div onclick="goHome()" class="p-8 pb-4 text-center cursor-pointer">
+            <h1 class="text-3xl font-black tracking-tighter uppercase">VWORLD <span class="text-blue-600">PRO</span></h1>
+            <p class="text-[10px] font-black text-slate-400 mt-1 tracking-[.3em]">Stealth Insight 1.5.1</p>
+        </div>
+
+        <nav class="flex px-8 border-b border-slate-100 text-sm font-black uppercase text-slate-500 space-x-8">
+            <button onclick="switchTab('search')" id="tab-search" class="py-4 active-tab">Search</button>
+            <button onclick="switchTab('layers')" id="tab-layers" class="py-4">Layers</button>
+            <button onclick="switchTab('batch')" id="tab-batch" class="py-4">Batch</button>
+        </nav>
+
+        <div class="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+            <div id="content-search" class="tab-content space-y-4">
+                <div class="bg-white border-2 border-slate-200 rounded-2xl p-1 flex items-center shadow-md focus-within:border-blue-500 transition-all">
+                    <input type="text" id="searchInput" onkeydown="if(event.key==='Enter') search()" placeholder="주소, 장소 검색..." class="px-4 py-3 text-base flex-1 outline-none font-bold text-slate-800">
+                    <button onclick="search()" class="bg-blue-600 text-white w-12 h-12 rounded-xl flex items-center justify-center hover:bg-blue-700 shadow-lg text-xl">🔍</button>
+                </div>
+                <div id="searchResults" class="space-y-2"></div>
+            </div>
+
+            <div id="content-layers" class="tab-content hidden space-y-4">
+                <div class="flex items-center gap-2">
+                    <input type="text" id="catalogSearch" oninput="filterLayers()" placeholder="카탈로그 필터..." class="text-sm bg-slate-50 border-2 border-slate-100 px-4 py-3 rounded-xl flex-1 focus:outline-none font-bold">
+                    <button onclick="fetchCapabilities()" class="bg-blue-600 text-white text-xs font-black px-5 py-3 rounded-xl shadow-lg hover:bg-blue-700">Fetch</button>
+                </div>
+                <div id="layerList" class="space-y-3 max-h-[500px] overflow-y-auto pr-2"></div>
+            </div>
+
+            <div id="content-batch" class="tab-content hidden text-center space-y-4">
+                <div onclick="document.getElementById('fileInput').click()" class="border-4 border-dashed border-slate-200 rounded-[3rem] py-16 px-6 hover:border-blue-500 bg-slate-50 cursor-pointer">
+                    <input type="file" id="fileInput" class="hidden" accept=".csv, .xlsx, .xls">
+                    <p class="text-4xl mb-4">📂</p>
+                    <p class="text-sm font-black text-slate-800">Excel / CSV Analysis</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="px-6 py-6 border-t-2 border-slate-100 bg-slate-50">
+            <h3 class="text-xs font-black text-slate-500 uppercase tracking-widest mb-4 flex items-center gap-2">★ Pinned Area</h3>
+            <div id="favorites" class="flex gap-3 overflow-x-auto pb-4 scrollbar-hide"></div>
+        </div>
+    </aside>
+
+    <div id="resizer" class="resizer h-full"></div>
+
+    <main class="flex-1 relative h-full">
+        <div id="map"></div>
+        
+        <div class="absolute bottom-10 left-10 z-10 flex flex-col gap-3">
+            <div class="flex gap-2 glass-ui p-2.5 rounded-3xl shadow-2xl">
+                <button id="btn-Base" class="px-8 py-3 rounded-2xl text-xs font-black transition-all bg-blue-600 text-white" onclick="changeBase('Base', this)">벡터지도</button>
+                <button id="btn-Satellite" class="px-8 py-3 rounded-2xl text-xs font-black transition-all text-slate-600 hover:bg-slate-100" onclick="changeBase('Satellite', this)">위성지도</button>
+                <button id="btn-LxJibun" class="px-5 py-3 rounded-2xl text-xs font-black transition-all text-emerald-600 border-2 border-emerald-100" onclick="changeBase('LxJibun', this)">LX연속지적도</button>
+            </div>
+            <div id="lx-opacity-ctrl" class="glass-ui px-6 py-4 rounded-3xl flex items-center gap-6 transition-all opacity-0 pointer-events-none w-fit shadow-2xl">
+                <div class="flex flex-col gap-1">
+                    <span class="text-[10px] font-black uppercase text-emerald-600 whitespace-nowrap">LX 투명도</span>
+                    <input type="range" min="0" max="1" step="0.1" value="0.8" oninput="layers.LxJibun.setOpacity(parseFloat(this.value))" class="w-32 accent-emerald-500 cursor-pointer">
+                </div>
+                <div class="h-8 w-[1px] bg-slate-200"></div>
+                <button id="btn-insight-toggle" onclick="toggleInsight()" class="flex items-center gap-2 bg-emerald-50 text-emerald-600 px-4 py-2 rounded-xl text-[11px] font-black hover:bg-emerald-100 transition-all border border-emerald-100">
+                    <span id="insight-status-icon">👁️</span>
+                    <span>필지속성 ON</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="absolute bottom-10 right-10 z-[100] flex flex-col gap-3">
+            <button onclick="map.getView().setZoom(map.getView().getZoom()+1)" class="w-14 h-14 bg-white border-4 border-slate-200 rounded-2xl shadow-2xl flex items-center justify-center font-black text-2xl text-slate-700">+</button>
+            <button onclick="map.getView().setZoom(map.getView().getZoom()-1)" class="w-14 h-14 bg-white border-4 border-slate-200 rounded-2xl shadow-2xl flex items-center justify-center font-black text-2xl text-slate-700">-</button>
+        </div>
+    </main>
+
+    <script>
+        const API_KEY = '3D81B08F-68E8-3930-A54D-13816E1E90B2';
+        
+        // Smart Proxy: Auto-detect Environment (Local vs Vercel)
+        const proxy = (url) => {
+            const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            const proxyBase = isLocal ? 'http://localhost:8000/proxy?url=' : '/api/proxy?url=';
+            return `${proxyBase}${encodeURIComponent(url)}`;
+        };
+        
+        let wfsLayers = [], favorites = [], hoverTimeout, isInsightActive = true;
+
+        const overlay = new ol.Overlay({ element: document.getElementById('popup'), autoPan: { animation: { duration: 250 } } });
+
+        const layers = {
+            Base: new ol.layer.Tile({ source: new ol.source.XYZ({ url: `https://api.vworld.kr/req/wmts/1.0.0/${API_KEY}/Base/{z}/{y}/{x}.png` }), visible: true }),
+            Satellite: new ol.layer.Tile({ source: new ol.source.XYZ({ url: `https://api.vworld.kr/req/wmts/1.0.0/${API_KEY}/Satellite/{z}/{y}/{x}.jpeg` }), visible: false }),
+            LxJibun: new ol.layer.Tile({ source: new ol.source.TileWMS({ url: proxy('https://api.vworld.kr/req/wms'), params: { 'LAYERS': 'lt_c_landinfobasemap', 'KEY': API_KEY, 'SERVICE': 'WMS', 'VERSION': '1.3.0', 'REQUEST': 'GetMap', 'FORMAT': 'image/png', 'TRANSPARENT': 'TRUE' } }), visible: false, opacity: 0.8, zIndex: 101 })
+        };
+
+        const map = new ol.Map({ target: 'map', layers: Object.values(layers), view: new ol.View({ center: ol.proj.fromLonLat([127.1704, 37.4495]), zoom: 17 }), overlays: [overlay], controls: [] });
+
+        const selectionLayer = new ol.layer.Vector({ source: new ol.source.Vector(), style: new ol.style.Style({ fill: new ol.style.Fill({ color: 'rgba(37, 99, 235, 0.2)' }), stroke: new ol.style.Stroke({ color: '#2563eb', width: 4 }) }), zIndex: 1000 });
+        const hoverLayer = new ol.layer.Vector({ source: new ol.source.Vector(), style: new ol.style.Style({ stroke: new ol.style.Stroke({ color: '#10b981', width: 3, lineDash: [5, 5] }) }), zIndex: 999 });
+        map.addLayer(selectionLayer); map.addLayer(hoverLayer);
+
+        function switchTab(id) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            document.getElementById(`content-${id}`).classList.remove('hidden');
+            document.querySelectorAll('nav button').forEach(b => b.classList.remove('active-tab'));
+            document.getElementById(`tab-${id}`).classList.add('active-tab');
+        }
+
+        function changeBase(type, btn) {
+            if(type === 'LxJibun') { 
+                const v = !layers[type].getVisible(); 
+                layers[type].setVisible(v); 
+                btn.classList.toggle('bg-emerald-600', v); 
+                btn.classList.toggle('text-white', v); 
+                const ctrl = document.getElementById('lx-opacity-ctrl');
+                ctrl.style.opacity = v ? '1' : '0';
+                ctrl.style.pointerEvents = v ? 'auto' : 'none';
+                return; 
+            }
+            ['Base', 'Satellite'].forEach(k => layers[k].setVisible(false)); layers[type].setVisible(true);
+            ['Base', 'Satellite'].forEach(k => document.getElementById(`btn-${k}`).classList.remove('bg-blue-600', 'text-white'));
+            btn.classList.add('bg-blue-600', 'text-white');
+        }
+
+        async function search() {
+            const q = document.getElementById('searchInput').value; if(!q) return;
+            const res = await fetch(proxy(`https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:4326&type=place&key=${API_KEY}&query=${encodeURIComponent(q)}&domain=localhost`));
+            const d = await res.json();
+            if(d.response?.status === 'OK') {
+                const itm = d.response.result.items[0].point;
+                map.getView().animate({ center: ol.proj.fromLonLat([parseFloat(itm.x), parseFloat(itm.y)]), zoom: 18 });
+            }
+        }
+
+        async function fetchCapabilities() {
+            try {
+                const res = await fetch(proxy(`https://api.vworld.kr/req/wms?key=${API_KEY}&domain=localhost&service=WMS&version=1.3.0&request=GetCapabilities`));
+                const text = await res.text();
+                const xml = new DOMParser().parseFromString(text, 'text/xml');
+                const layersNode = xml.getElementsByTagName('Layer');
+                let html = '';
+                for (let i = 1; i < layersNode.length; i++) {
+                    const name = layersNode[i].getElementsByTagName('Name')[0]?.textContent;
+                    const title = layersNode[i].getElementsByTagName('Title')[0]?.textContent;
+                    if (name && title) {
+                        html += `
+                            <div class="layer-item bg-slate-50 p-4 rounded-2xl border-2 border-slate-100 flex justify-between items-center hover:border-blue-400 transition-all shadow-sm" data-title="${title}">
+                                <div class="flex-1">
+                                    <h4 class="text-xs font-black text-slate-800">${title}</h4>
+                                    <p class="text-[9px] text-slate-400 font-bold uppercase">${name}</p>
+                                </div>
+                                <div class="flex gap-1">
+                                    <button onclick="toggleFavorite('${title}', '${name}', this)" class="w-8 h-8 rounded-lg flex items-center justify-center border-2 border-slate-200 hover:bg-yellow-50 hover:border-yellow-200 transition-all text-[10px] bg-white">★</button>
+                                    <button onclick="addWmsLayer('${title}', '${name}', this)" class="w-8 h-8 rounded-lg flex items-center justify-center bg-blue-600 text-white font-black hover:bg-blue-700 transition-all text-sm shadow-md">+</button>
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+                document.getElementById('layerList').innerHTML = html || '<p class="text-center text-slate-400 py-10 font-bold">No layers found.</p>';
+            } catch (err) {
+                document.getElementById('layerList').innerHTML = '<p class="text-center text-red-500 py-10 font-bold">Failed to connect to VWORLD.</p>';
+            }
+        }
+
+        function filterLayers() {
+            const q = document.getElementById('catalogSearch').value.toLowerCase();
+            document.querySelectorAll('.layer-item').forEach(el => {
+                const title = el.dataset.title.toLowerCase();
+                el.style.display = title.includes(q) ? 'flex' : 'none';
+            });
+        }
+
+        function addWmsLayer(title, layerName, btn) {
+            if (layers[layerName]) { 
+                const v = !layers[layerName].getVisible(); 
+                layers[layerName].setVisible(v); 
+                if (btn) {
+                    btn.innerText = v ? '-' : '+';
+                    btn.classList.toggle('bg-blue-600', v);
+                    btn.classList.toggle('bg-slate-400', !v);
+                }
+                return; 
+            }
+            const lyr = new ol.layer.Tile({
+                source: new ol.source.TileWMS({
+                    url: proxy('https://api.vworld.kr/req/wms'),
+                    params: { 'LAYERS': layerName, 'KEY': API_KEY, 'SERVICE': 'WMS', 'VERSION': '1.3.0', 'REQUEST': 'GetMap', 'FORMAT': 'image/png', 'TRANSPARENT': 'TRUE' }
+                }),
+                zIndex: 200
+            });
+            layers[layerName] = lyr;
+            map.addLayer(lyr);
+            if (btn) {
+                btn.innerText = '-';
+                btn.classList.add('bg-blue-600');
+            }
+        }
+
+        function toggleFavorite(title, name, btn) {
+            const idx = favorites.findIndex(f => f.name === name);
+            if (idx > -1) {
+                favorites.splice(idx, 1);
+                if (btn) btn.classList.replace('text-yellow-500', 'text-slate-400');
+                if (btn) btn.classList.replace('border-yellow-200', 'border-slate-200');
+            } else {
+                favorites.push({ title, name });
+                if (btn) btn.classList.add('text-yellow-500', 'border-yellow-200');
+            }
+            updateFavoritesUI();
+        }
+
+        function updateFavoritesUI() {
+            const div = document.getElementById('favorites');
+            div.innerHTML = favorites.map(f => `
+                <div class="min-w-[120px] bg-white border-2 border-slate-200 p-3 rounded-2xl shadow-sm hover:border-blue-500 cursor-pointer flex flex-col gap-1 transition-all" onclick="addWmsLayer('${f.title}', '${f.name}')">
+                    <p class="text-[10px] font-black text-slate-800 truncate">${f.title}</p>
+                    <p class="text-[8px] text-slate-400 font-bold uppercase truncate">${f.name}</p>
+                </div>
+            `).join('');
+        }
+
+        map.on('pointermove', (e) => {
+            if (e.dragging) return;
+            clearTimeout(hoverTimeout);
+            hoverTimeout = setTimeout(() => {
+                const coord = ol.proj.toLonLat(e.coordinate);
+                handleHover(coord[0], coord[1], e.coordinate);
+            }, 250);
+        });
+
+        // Click only for solid highlight, no detail panel
+        map.on('singleclick', async (e) => {
+            const coord = ol.proj.toLonLat(e.coordinate);
+            selectionLayer.getSource().clear();
+            const res = await fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${coord[0]} ${coord[1]})&crs=EPSG:4326&domain=localhost`));
+            const d = await res.json();
+            if(d.response?.status === 'OK' && d.response.result.featureCollection.features.length > 0) {
+                selectionLayer.getSource().addFeatures(new ol.format.GeoJSON().readFeatures(d.response.result.featureCollection));
+            }
+        });
+
+        async function handleHover(lon, lat, mapCoord) {
+            if (!layers.LxJibun.getVisible() || !isInsightActive || map.getView().getZoom() < 16) { 
+                overlay.setPosition(undefined); 
+                hoverLayer.getSource().clear();
+                return; 
+            }
+            try {
+                const res = await fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${lon} ${lat})&crs=EPSG:4326&domain=localhost`));
+                const d = await res.json();
+                if (d.response?.status === 'OK' && d.response.result.featureCollection.features.length > 0) {
+                    const p = d.response.result.featureCollection.features[0].properties;
+                    console.log("DEBUG: LX Parcel Properties:", p);
+                    let jiga = parseInt(p.pblntf_pclnd || p.jiga_ilp || p.pnilp || 0);
+                    let regulations = new Set();
+                    
+                    // Comprehensive Parallel Fetch: Districts, Zones, and Restriction Areas
+                    try {
+                        const regLayers = [
+                            'LT_C_UQ111', 'LT_C_UQ112', 'LT_C_UQ113', 'LT_C_UQ114', // 용도지역 (Districts)
+                            'LT_C_AIS001', // 가축사육제한 (Livestock)
+                            'LT_C_UQ121', // 개발제한구역 (Greenbelt)
+                            'LT_C_UQ123', // 군사시설보호 (Military)
+                            'LT_C_UQ162'  // 지구단위계획 (Unit Plan)
+                        ];
+
+                        const fetches = [
+                            p.pnu ? fetch(proxy(`https://api.vworld.kr/ned/wfs/getIndvdLandPriceWFS?service=WFS&version=1.1.0&request=GetFeature&typename=dt_d150&pnu=${p.pnu}&output=application/json&key=${API_KEY}&domain=localhost`)) : Promise.resolve(null),
+                            ...regLayers.map(layer => fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=${layer}&key=${API_KEY}&geomFilter=POINT(${lon} ${lat})&crs=EPSG:4326&domain=localhost`)))
+                        ];
+
+                        const responses = await Promise.all(fetches);
+                        const results = await Promise.all(responses.map(r => r ? r.json() : Promise.resolve(null)));
+
+                        // Parse Land Price
+                        if (results[0]) {
+                            const member = results[0].FeatureCollection?.featureMember?.[0]?.dt_d150 || results[0].features?.[0]?.properties;
+                            if (member) jiga = parseInt(member.pblntf_pclnd || member.pnilp || 0);
+                        }
+
+                        // Parse ALL Regulation Layers
+                        for (let i = 1; i < results.length; i++) {
+                            const d = results[i];
+                            if (d?.response?.status === 'OK' && d.response.result.featureCollection.features.length > 0) {
+                                const prop = d.response.result.featureCollection.features[0].properties;
+                                const name = prop.uname || prop.nm || prop.name || prop.luse_nm;
+                                if (name) regulations.add(name);
+                            }
+                        }
+                    } catch (err) { console.error("Regulation Fetch Error:", err); }
+
+                    const regList = regulations.size > 0 ? Array.from(regulations).join(', ') : '-';
+                    const area = parseFloat(p.parea || p.ar || 0);
+                    const pyungArea = Math.round(area / 3.3058).toLocaleString();
+                    const jigaK = Math.round(jiga / 1000).toLocaleString();
+                    const pyungPriceK = Math.round((jiga * 3.3058) / 1000).toLocaleString();
+
+                    document.getElementById('popup-content').innerHTML = `
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <p class="text-[10px] text-emerald-400 font-black uppercase tracking-widest leading-none">Parcel Insight</p>
+                                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-none">VWORLD PRO 1.5.1</p>
+                            </div>
+                            <div>
+                                <h3 class="text-xl font-black text-white leading-tight">${p.emd_nm || ''} ${p.jibun || ''}</h3>
+                                <div class="flex items-center gap-2 mt-3 text-xs font-bold text-slate-300">
+                                    <span class="bg-blue-600/30 text-blue-400 px-3 py-2 rounded-xl flex items-center justify-center min-w-[60px] text-center">${p.jimok || '-'}</span>
+                                    <div class="bg-slate-700/50 px-3 py-1.5 rounded-xl border border-slate-600/50 flex-1 leading-tight">
+                                        <p>${area.toLocaleString()}㎡</p>
+                                        <p class="text-[10px] text-slate-500 font-medium">(${pyungArea}평)</p>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="py-3 px-4 bg-slate-800/50 rounded-2xl border border-white/5">
+                                <p class="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1.5 font-bold">Land Use Regulation</p>
+                                <p class="text-[11px] font-bold text-slate-200 leading-snug">${regList}</p>
+                            </div>
+                            <div class="pt-4 border-t border-white/10 flex justify-between items-end">
+                                <div>
+                                    <p class="text-[9px] text-slate-500 font-black uppercase tracking-tighter mb-1">1㎡ 가격 (천원)</p>
+                                    <p class="text-lg font-black text-yellow-500">${jiga > 0 ? jigaK + ' <span class="text-xs">천원</span>' : '정보 없음'}</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-[9px] text-slate-500 font-black uppercase tracking-tighter mb-1">평당 가격 (천원)</p>
+                                    <p class="text-lg font-black text-white">${jiga > 0 ? pyungPriceK + ' <span class="text-xs text-slate-400">천원</span>' : '-'}</p>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    overlay.setPosition(mapCoord);
+                    document.getElementById('popup').style.display = 'block';
+                    hoverLayer.getSource().clear();
+                    hoverLayer.getSource().addFeatures(new ol.format.GeoJSON().readFeatures(d.response.result.featureCollection));
+                } else {
+                    overlay.setPosition(undefined); document.getElementById('popup').style.display = 'none'; hoverLayer.getSource().clear();
+                }
+            } catch (e) { }
+        }
+
+        function goHome() { map.getView().animate({ center: ol.proj.fromLonLat([127.1704, 37.4495]), zoom: 17 }); }
+
+        function toggleInsight() {
+            isInsightActive = !isInsightActive;
+            const btn = document.getElementById('btn-insight-toggle');
+            const icon = document.getElementById('insight-status-icon');
+            const label = btn.querySelector('span:last-child');
+            
+            if (isInsightActive) {
+                btn.classList.replace('bg-slate-100', 'bg-emerald-50');
+                btn.classList.replace('text-slate-500', 'text-emerald-600');
+                icon.innerText = '👁️';
+                label.innerText = '필지속성 ON';
+            } else {
+                btn.classList.replace('bg-emerald-50', 'bg-slate-100');
+                btn.classList.replace('text-emerald-600', 'text-slate-500');
+                icon.innerText = '🙈';
+                label.innerText = '필지속성 OFF';
+                overlay.setPosition(undefined);
+                hoverLayer.getSource().clear();
+            }
+        }
+
+        const sidebar = document.querySelector('.sidebar');
+        const resizer = document.getElementById('resizer');
+        let isResizing = false;
+
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            resizer.classList.add('resizing');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            const newWidth = e.clientX;
+            if (newWidth >= 250 && newWidth <= 800) {
+                sidebar.style.width = `${newWidth}px`;
+                map.updateSize();
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (!isResizing) return;
+            isResizing = false;
+            resizer.classList.remove('resizing');
+            document.body.style.cursor = 'default';
+            document.body.style.userSelect = 'auto';
+        });
+
+        function toggleSidebar() {
+            const sb = document.querySelector('.sidebar');
+            const rz = document.getElementById('resizer');
+            const btn = document.querySelector('.sidebar-toggle');
+            const m = document.querySelector('main');
+            const isCollapsed = sb.classList.toggle('collapsed');
+            rz.classList.toggle('collapsed', isCollapsed);
+            btn.innerText = isCollapsed ? '▶' : '◀';
+            
+            // Adjust main content left margin to fill the gap
+            if (isCollapsed) {
+                m.style.marginLeft = `-${sb.offsetWidth}px`;
+            } else {
+                m.style.marginLeft = '0';
+            }
+            
+            setTimeout(() => map.updateSize(), 350);
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,56 @@
+# This file contains metadata for your plugin.
+
+# This file should be included when you package your plugin.# Mandatory items:
+
+[general]
+name=[베타]공간정보 오픈플랫폼(브이월드)
+qgisMinimumVersion=3.0
+description=[공지]베타 테스트 중인 기능으로 오류가 발생할 수 있습니다.
+version=0.27
+author=dongYoun, Lee
+email=dy.lee@spacen.or.kr
+
+about=공간정보를 쉽게 활용할 수 있도록 브이월드에서 제공하는 서비스를 QGIS에서 사용할 수 있도록 기능을 제공
+
+tracker=https://github.com/V-world/QGIS_Vplugin/issues
+repository=https://github.com/V-world/QGIS_Vplugin
+# End of mandatory metadata
+
+# Recommended items:
+
+hasProcessingProvider=no
+# Uncomment the following line and add your changelog:
+#changelog= 줄 바꿈까지 넣어 표기
+changelog=[0.27]WFS 불러오기 오류 개선
+[0.26] 패널이 계속 추가되는 오류, WFS 라벨 추가 시 3.26 이상 버전에서 오류 발생 개선
+[0.25] 연속지적도, LX맵 로드시 라벨 및 스타일 기본 적용 추가 및 일부 오류 개선
+[0.23] 지오코딩 skip 오류 관련 예외
+[0.22] 지오코딩 오류 개선(인증키 정보 로드 실패)
+[0.21] SSL 연결 실패 시 안내 문구 추가, 주소검색의 PNU 공백 제거 기능 추가, wfs 로드 일부 오류 임시개선
+[0.20] https, https(보안/비보안) 설정 기능 추가
+[0.19] 주소검색 기능에 PNU 검색을 LX맵으로 변경
+[0.18] 주소검색(PNU)의 x y 포인트 생성 오류 개선
+
+# Tags are comma separated with spaces allowed
+tags=wms, wfs, search
+
+homepage=https://vworld.kr
+category=Plugins
+icon=icon.png
+# experimental flag
+experimental=True
+
+# deprecated flag (applies to the whole plugin, not just a single version)
+deprecated=False
+
+# Since QGIS 3.8, a comma separated list of plugins to be installed
+# (or upgraded) can be specified.
+# Check the documentation for more information.
+# plugin_dependencies=
+
+Category of the plugin: Raster, Vector, Database or Web
+# category=
+
+# If the plugin can run on QGIS Server.
+server=False
+

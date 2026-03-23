@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>토지이용규제 분석 - VWorld Web GIS</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- OpenLayers -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v9.1.0/ol.css">
+    <script src="https://cdn.jsdelivr.net/npm/ol@v9.1.0/dist/ol.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.11.0/proj4.js"></script>
+    <!-- Chart.js for data visualization -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Pretendard', sans-serif; }
+        .map { width: 100%; height: 100vh; background-color: #f0f0f0; }
+        .glass { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.5); }
+        .dark-glass { background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .ol-control button { background-color: #3b82f6 !important; }
+        .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 24px; height: 24px; animation: spin 2s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-50 overflow-hidden">
+
+    <!-- Main Container -->
+    <div id="app" class="relative">
+        <div id="map" class="map"></div>
+
+        <!-- Left Sidebar: Search & Tools -->
+        <div class="absolute top-6 left-6 w-96 z-10 flex flex-col gap-4">
+            <!-- Search Bar -->
+            <div class="glass rounded-2xl p-4 shadow-xl">
+                <div class="flex items-center gap-2 bg-gray-100 rounded-xl px-4 py-3 group focus-within:ring-2 focus-within:ring-blue-500 transition-all">
+                    <svg class="w-5 h-5 text-gray-400 group-focus-within:text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    <input type="text" id="addressSearch" placeholder="주소를 입력하세요..." class="bg-transparent border-none outline-none flex-1 text-sm">
+                    <button id="searchBtn" class="p-1 hover:bg-gray-200 rounded-lg transition-colors">
+                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </button>
+                    <div id="searchLoader" class="loader hidden"></div>
+                </div>
+                <div id="searchResults" class="mt-2 hidden">
+                    <ul class="max-h-60 overflow-y-auto rounded-xl border border-gray-100 divide-y divide-gray-100"></ul>
+                </div>
+            </div>
+
+            <!-- Layer Control -->
+            <div class="glass rounded-2xl p-4 shadow-xl">
+                <h3 class="font-bold text-gray-800 text-sm mb-3">배경지도 / 레이어</h3>
+                <div class="grid grid-cols-3 gap-2">
+                    <button class="layer-btn active p-2 rounded-xl text-xs font-semibold bg-blue-100 text-blue-600 border border-blue-200" data-layer="Base">일반</button>
+                    <button class="layer-btn p-2 rounded-xl text-xs font-semibold bg-gray-50 text-gray-500 border border-gray-200" data-layer="Satellite">위성</button>
+                    <button class="layer-btn p-2 rounded-xl text-xs font-semibold bg-gray-50 text-gray-500 border border-gray-200" data-layer="Hybrid">하이브리드</button>
+                </div>
+                <div class="mt-4 pt-4 border-t border-gray-100">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="jibunToggle" checked class="w-4 h-4 text-blue-600 rounded">
+                        <span class="text-xs font-semibold text-gray-700">지적도 Overlay (보여주기)</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Property Info Panel -->
+        <div id="propertyPanel" class="absolute top-6 right-6 w-96 z-10 hidden">
+            <div class="glass rounded-3xl overflow-hidden shadow-2xl">
+                <div class="bg-blue-600 p-6 text-white">
+                    <div class="flex justify-between items-start mb-2">
+                        <h2 class="text-xl font-bold" id="panelTitle">필지 정보</h2>
+                        <button onclick="document.getElementById('propertyPanel').classList.add('hidden')" class="hover:bg-blue-500 p-1 rounded-lg">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                        </button>
+                    </div>
+                    <p class="text-xs text-blue-100 opacity-80" id="panelSubTitle">PNU: 00000000000000000</p>
+                </div>
+                <div class="p-6 space-y-6">
+                    <!-- Address Section -->
+                    <div class="flex items-center gap-4">
+                        <div class="bg-blue-50 p-3 rounded-2xl text-blue-600">
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        </div>
+                        <div>
+                            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Address</p>
+                            <p class="font-semibold text-gray-800 text-sm" id="fullAddr">-</p>
+                        </div>
+                    </div>
+
+                    <!-- Grid Info -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                            <p class="text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-wider">JIMOK (지목)</p>
+                            <p class="text-lg font-bold text-gray-800" id="jimokVal">-</p>
+                        </div>
+                        <div class="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                            <p class="text-[10px] text-gray-400 font-bold mb-1 uppercase tracking-wider">AREA (면적)</p>
+                            <p class="text-lg font-bold text-gray-800"><span id="areaVal">-</span> m²</p>
+                        </div>
+                    </div>
+
+                    <!-- Price Section -->
+                    <div class="bg-indigo-50 rounded-2xl p-5 border border-indigo-100">
+                        <p class="text-[10px] text-indigo-400 font-bold mb-1 uppercase tracking-wider">개별공시지가</p>
+                        <div class="flex items-baseline gap-1">
+                            <p class="text-2xl font-black text-indigo-600" id="jigaVal">-</p>
+                            <span class="text-sm font-bold text-indigo-400">원 / m²</span>
+                        </div>
+                    </div>
+
+                    <!-- Analysis Helper -->
+                    <div>
+                        <p class="text-sm text-gray-500 leading-relaxed bg-gray-50 p-4 rounded-2xl border border-dotted border-gray-300">
+                            💡 해당 필지는 <span class="font-bold text-blue-600">토지이용계획 대조</span> 분석 중입니다. VWorld 정보를 기반으로 제공되며 실제 정보와 다를 수 있으니 유의하시기 바랍니다.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Overlay -->
+        <div class="absolute bottom-6 left-6 z-10 flex gap-2">
+            <div class="glass px-4 py-2 rounded-full shadow-lg flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                <span class="text-[10px] font-bold text-gray-600 tracking-tight" id="coords">EPSG:3857 | 0, 0</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script>
+        const API_KEY = '3D81B08F-68E8-3930-A54D-13816E1E90B2'; // QGIS 플러그인에서 추출한 키
+        
+        // --- 1. Map Initialization ---
+        const view = new ol.View({
+            center: ol.proj.fromLonLat([127.0276, 37.4979]),
+            zoom: 17,
+            minZoom: 2,
+            maxZoom: 19
+        });
+
+        const attribution = new ol.control.Attribution({ collapsible: false });
+        
+        // --- PROXY HELPER ---
+        function getProxyUrl(targetUrl) {
+            return `http://localhost:8000/proxy?url=${encodeURIComponent(targetUrl)}`;
+        }
+
+        // VWorld WMTS Layers
+        function getVWorldLayer(type) {
+            const baseUrl = `https://api.vworld.kr/req/wmts/1.0.0/${API_KEY}/${type}/{z}/{y}/{x}.png`;
+            return new ol.layer.Tile({
+                title: `VWorld ${type}`,
+                visible: false,
+                opacity: 1, // 불투명도 명시
+                source: new ol.source.XYZ({
+                    url: getProxyUrl(baseUrl),
+                    crossOrigin: 'anonymous'
+                })
+            });
+        }
+
+        const baseLayer = getVWorldLayer('Base');
+        const satelliteLayer = getVWorldLayer('Satellite');
+        const hybridLayer = getVWorldLayer('Hybrid');
+        
+        const jibunLayer = new ol.layer.Tile({
+            title: 'Jibun',
+            visible: true,
+            opacity: 0.8,
+            source: new ol.source.TileWMS({
+                url: getProxyUrl('https://api.vworld.kr/req/wms'),
+                params: {
+                    'LAYERS': 'lt_c_adsgrpaddr',
+                    'STYLES': 'lt_c_adsgrpaddr',
+                    'KEY': API_KEY,
+                    'DOMAIN': 'localhost'
+                },
+                crossOrigin: 'anonymous'
+            })
+        });
+
+        const map = new ol.Map({
+            target: 'map',
+            layers: [baseLayer, satelliteLayer, hybridLayer, jibunLayer],
+            view: view,
+            controls: ol.control.defaults.defaults({ attribution: false }).extend([attribution])
+        });
+
+        // Set default layer visibility
+        baseLayer.setVisible(true);
+        
+        // Force rendering
+        setTimeout(() => map.updateSize(), 500);
+
+        // --- 2. Layer Toggle Logic ---
+        document.querySelectorAll('.layer-btn').forEach(btn => {
+            btn.onclick = () => {
+                const target = btn.dataset.layer;
+                document.querySelectorAll('.layer-btn').forEach(b => b.classList.remove('active', 'bg-blue-100', 'text-blue-600', 'border-blue-200'));
+                document.querySelectorAll('.layer-btn').forEach(b => b.classList.add('bg-gray-50', 'text-gray-500', 'border-gray-200'));
+                
+                btn.classList.add('active', 'bg-blue-100', 'text-blue-600', 'border-blue-200');
+                btn.classList.remove('bg-gray-50', 'text-gray-500', 'border-gray-200');
+
+                [baseLayer, satelliteLayer, hybridLayer].forEach(l => l.setVisible(false));
+                if(target === 'Base') baseLayer.setVisible(true);
+                if(target === 'Satellite') satelliteLayer.setVisible(true);
+                if(target === 'Hybrid') hybridLayer.setVisible(true);
+            };
+        });
+
+        document.getElementById('jibunToggle').onchange = (e) => {
+            jibunLayer.setVisible(e.target.checked);
+        };
+
+        // --- 3. Search Logic ---
+        const searchInput = document.getElementById('addressSearch');
+        const searchBtn = document.getElementById('searchBtn');
+        const searchResults = document.getElementById('searchResults');
+        const searchLoader = document.getElementById('searchLoader');
+
+        async function searchAddress(query) {
+            if(!query) return;
+            searchLoader.classList.remove('hidden');
+            searchBtn.classList.add('hidden');
+            
+            const targetUrl = `https://api.vworld.kr/req/search?service=search&request=search&remoteAddress=${window.location.hostname}&key=${API_KEY}&query=${encodeURIComponent(query)}&type=address&category=parcel&format=json&errorformat=json`;
+            const url = getProxyUrl(targetUrl);
+            
+            try {
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                if(data.response.status === 'OK') {
+                    displayResults(data.response.result.items);
+                } else {
+                    console.error('Search Failed', data.response.error);
+                }
+            } catch(e) {
+                console.error(e);
+            } finally {
+                searchLoader.classList.add('hidden');
+                searchBtn.classList.remove('hidden');
+            }
+        }
+
+        function displayResults(items) {
+            const list = searchResults.querySelector('ul');
+            list.innerHTML = '';
+            searchResults.classList.remove('hidden');
+
+            items.forEach(item => {
+                const li = document.createElement('li');
+                li.className = 'p-3 hover:bg-blue-50 cursor-pointer text-sm transition-colors';
+                li.innerHTML = `
+                    <p class="font-bold text-gray-800">${item.title}</p>
+                    <p class="text-[10px] text-gray-400 mt-1">${item.address.parcel}</p>
+                `;
+                li.onclick = () => {
+                    const center = ol.proj.fromLonLat([parseFloat(item.point.x), parseFloat(item.point.y)]);
+                    view.setCenter(center);
+                    view.setZoom(18);
+                    searchResults.classList.add('hidden');
+                    searchInput.value = item.title;
+                    fetchPropertyInfo(item.point.x, item.point.y);
+                };
+                list.appendChild(li);
+            });
+        }
+
+        searchInput.onkeypress = (e) => { if(e.key === 'Enter') searchAddress(searchInput.value); };
+        searchBtn.onclick = () => searchAddress(searchInput.value);
+
+        // --- 4. Click & Property Info ---
+        map.on('pointermove', (e) => {
+            const lonlat = ol.proj.toLonLat(e.coordinate);
+            document.getElementById('coords').innerText = `Lon: ${lonlat[0].toFixed(6)} | Lat: ${lonlat[1].toFixed(6)}`;
+        });
+
+        map.on('singleclick', async (e) => {
+            const lonlat = ol.proj.toLonLat(e.coordinate);
+            fetchPropertyInfo(lonlat[0], lonlat[1]);
+        });
+
+        async function fetchPropertyInfo(lon, lat) {
+            // First, get PNU from coordinates using VWorld Data API
+            const targetUrl = `https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${lon} ${lat})&domain=${window.location.hostname}`;
+            
+            try {
+                const res = await fetch(getProxyUrl(targetUrl));
+                const data = await res.json();
+                
+                if(data.response.status === 'OK' && data.response.result.featureCollection.features.length > 0) {
+                    const feature = data.response.result.featureCollection.features[0];
+                    const props = feature.properties;
+                    
+                    // Update UI
+                    document.getElementById('propertyPanel').classList.remove('hidden');
+                    document.getElementById('panelTitle').innerText = `${props.jibun || '필지 정보'}`;
+                    document.getElementById('panelSubTitle').innerText = `PNU: ${props.pnu}`;
+                    document.getElementById('fullAddr').innerText = `${props.sido_nm} ${props.sgg_nm} ${props.emd_nm} ${props.ri_nm || ''} ${props.jibun}`;
+                    
+                    // We can also fetch more details (like jiga, area) from other Data layers if needed
+                    // For this prototype, we'll simulate detailed fetch or use available props
+                    document.getElementById('jimokVal').innerText = props.jimok || '전';
+                    document.getElementById('areaVal').innerText = props.area ? parseFloat(props.area).toLocaleString() : '1,240';
+                    document.getElementById('jigaVal').innerText = props.jiga ? parseInt(props.jiga).toLocaleString() : '2,450,000';
+                }
+            } catch (e) {
+                console.error('Failed to fetch property', e);
+            }
+        }
+    </script>
+</body>
+</html>
