@@ -138,8 +138,10 @@
         const API_KEY = '3283C4CC-DAD6-34EB-AE67-2430215D21AC';
         
         // Smart Proxy: Auto-detect Environment (Local vs Vercel)
-        const proxy = (url) => {
+        const proxy = (url, forceProxy = false) => {
             const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            // Use local Python proxy for development, but call DIRECTLY on Vercel for better performance/reliability
+            if (!isLocal && !forceProxy) return url; 
             const proxyBase = isLocal ? 'http://localhost:8000/proxy?url=' : '/api/proxy?url=';
             return `${proxyBase}${encodeURIComponent(url)}`;
         };
@@ -328,7 +330,7 @@
                         ];
 
                         const fetches = [
-                            p.pnu ? fetch(proxy(`https://api.vworld.kr/ned/wfs/getIndvdLandPriceWFS?service=WFS&version=1.1.0&request=GetFeature&typename=dt_d150&pnu=${p.pnu}&output=application/json&key=${API_KEY}&domain=${window.location.hostname}`)) : Promise.resolve(null),
+                            p.pnu ? fetch(proxy(`https://api.vworld.kr/ned/wfs/getIndvdLandPriceWFS?service=WFS&version=1.1.0&request=GetFeature&typename=dt_d150&pnu=${p.pnu}&output=application/json&key=${API_KEY}&domain=${window.location.hostname}`, true)) : Promise.resolve(null),
                             ...regLayers.map(layer => fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=${layer}&key=${API_KEY}&geomFilter=POINT(${lon} ${lat})&crs=EPSG:4326&domain=${window.location.hostname}`)))
                         ];
 
