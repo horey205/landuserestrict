@@ -12,16 +12,29 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         body { font-family: 'Inter', Pretendard, sans-serif; margin: 0; overflow: hidden; background: #0f172a; color: #1e293b; }
         #map { width: 100%; height: 100%; background: #f8fafc; cursor: crosshair; }
-        .sidebar { background: #ffffff; border-right: 1px solid #e2e8f0; position: relative; min-width: 250px; max-width: 800px; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 50; }
-        .sidebar.collapsed { transform: translateX(-100%); min-width: 0; }
+        .sidebar { background: #ffffff; border-right: 1px solid #e2e8f0; position: relative; width: 400px; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), width 0.3s; z-index: 50; }
+        .sidebar.collapsed { transform: translateX(-100%); width: 0 !important; min-width: 0 !important; }
         .resizer { width: 6px; cursor: col-resize; background: transparent; transition: background 0.2s; z-index: 40; }
         .resizer.collapsed { display: none; }
         .resizer:hover, .resizer.resizing { background: rgba(37, 99, 235, 0.2); }
         .active-tab { color: #2563eb; font-weight: 800; border-bottom: 4px solid #2563eb; }
-        .sidebar-toggle { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); width: 24px; height: 50px; background: white; border: 1px solid #e2e8f0; border-left: 0; border-radius: 0 12px 12px 0; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #94a3b8; font-weight: 900; box-shadow: 4px 0 10px -2px rgba(0,0,0,0.1); transition: color 0.2s; }
-        .sidebar-toggle:hover { color: #2563eb; }
+        .sidebar-toggle { position: absolute; left: 100%; top: 50%; transform: translateY(-50%); width: 32px; height: 64px; background: white; border: 1px solid #e2e8f0; border-left: 0; border-radius: 0 16px 16px 0; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #94a3b8; font-weight: 900; box-shadow: 4px 0 15px -2px rgba(0,0,0,0.15); transition: all 0.2s; z-index: 60; }
+        .sidebar-toggle:hover { color: #2563eb; background: #f8fafc; }
         .glass-ui { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); border: 1px solid #cbd5e1; }
         
+        /* Mobile Responsive Adjustments */
+        @media (max-width: 768px) {
+            .sidebar { position: absolute; width: 85% !important; height: 100%; }
+            .sidebar-toggle { width: 40px; height: 80px; left: 100%; top: 20%; transform: translateY(-20%); }
+            .resizer { display: none !important; }
+            .ol-popup { min-width: 280px !important; width: 90vw !important; left: 50% !important; transform: translateX(-50%) !important; bottom: 100px !important; }
+            .ol-popup:after { left: 50% !important; }
+            .map-controls-left { left: 1rem !important; right: 1rem !important; bottom: 1rem !important; width: auto !important; }
+            .map-controls-right { right: 1rem !important; bottom: 8rem !important; }
+            .change-base-group { flex-wrap: wrap; justify-content: center; }
+            .change-base-group button { flex: 1; min-width: 80px; padding-left: 0.5rem; padding-right: 0.5rem; }
+        }
+
         .ol-popup {
             position: absolute;
             background: rgba(15, 23, 42, 0.92);
@@ -59,7 +72,7 @@
         <div id="popup-content"></div>
     </div>
 
-    <aside class="sidebar w-[400px] h-full flex flex-col z-20 shadow-2xl">
+    <aside class="sidebar h-full flex flex-col z-20 shadow-2xl">
         <button onclick="toggleSidebar()" class="sidebar-toggle">◀</button>
         <div onclick="goHome()" class="p-8 pb-4 text-center cursor-pointer">
             <h1 class="text-3xl font-black tracking-tighter uppercase">VWORLD <span class="text-blue-600">PRO</span></h1>
@@ -109,8 +122,8 @@
     <main class="flex-1 relative h-full">
         <div id="map"></div>
         
-        <div class="absolute bottom-10 left-10 z-10 flex flex-col gap-3">
-            <div class="flex gap-2 glass-ui p-2.5 rounded-3xl shadow-2xl">
+        <div class="map-controls-left absolute bottom-10 left-10 z-10 flex flex-col gap-3">
+            <div class="change-base-group flex gap-2 glass-ui p-2.5 rounded-3xl shadow-2xl">
                 <button id="btn-Base" class="px-8 py-3 rounded-2xl text-xs font-black transition-all bg-blue-600 text-white" onclick="changeBase('Base', this)">벡터지도</button>
                 <button id="btn-Satellite" class="px-8 py-3 rounded-2xl text-xs font-black transition-all text-slate-600 hover:bg-slate-100" onclick="changeBase('Satellite', this)">위성지도</button>
                 <button id="btn-LxJibun" class="px-5 py-3 rounded-2xl text-xs font-black transition-all text-emerald-600 border-2 border-emerald-100" onclick="changeBase('LxJibun', this)">LX연속지적도</button>
@@ -128,9 +141,9 @@
             </div>
         </div>
 
-        <div class="absolute bottom-10 right-10 z-[100] flex flex-col gap-3">
-            <button onclick="map.getView().setZoom(map.getView().getZoom()+1)" class="w-14 h-14 bg-white border-4 border-slate-200 rounded-2xl shadow-2xl flex items-center justify-center font-black text-2xl text-slate-700">+</button>
-            <button onclick="map.getView().setZoom(map.getView().getZoom()-1)" class="w-14 h-14 bg-white border-4 border-slate-200 rounded-2xl shadow-2xl flex items-center justify-center font-black text-2xl text-slate-700">-</button>
+        <div class="map-controls-right absolute bottom-10 right-10 z-[100] flex flex-col gap-3">
+            <button onclick="map.getView().setZoom(map.getView().getZoom()+1)" class="w-14 h-14 bg-white/90 backdrop-blur-md border-4 border-slate-200 rounded-2xl shadow-2xl flex items-center justify-center font-black text-2xl text-slate-700 hover:bg-white transition-all">+</button>
+            <button onclick="map.getView().setZoom(map.getView().getZoom()-1)" class="w-14 h-14 bg-white/90 backdrop-blur-md border-4 border-slate-200 rounded-2xl shadow-2xl flex items-center justify-center font-black text-2xl text-slate-700 hover:bg-white transition-all">-</button>
         </div>
     </main>
 
@@ -459,17 +472,30 @@
             const btn = document.querySelector('.sidebar-toggle');
             const m = document.querySelector('main');
             const isCollapsed = sb.classList.toggle('collapsed');
-            rz.classList.toggle('collapsed', isCollapsed);
+            
+            if (rz) rz.classList.toggle('collapsed', isCollapsed);
             btn.innerText = isCollapsed ? '▶' : '◀';
             
-            // Adjust main content left margin to fill the gap
-            if (isCollapsed) {
-                m.style.marginLeft = `-${sb.offsetWidth}px`;
+            // Adjust main content only if not in mobile view
+            if (window.innerWidth > 768) {
+                if (isCollapsed) {
+                    m.style.marginLeft = `-${sb.offsetWidth}px`;
+                } else {
+                    m.style.marginLeft = '0';
+                }
             } else {
                 m.style.marginLeft = '0';
             }
             
             setTimeout(() => map.updateSize(), 350);
+        }
+
+        // Initialize mobile state
+        if (window.innerWidth <= 768) {
+            const sb = document.querySelector('.sidebar');
+            const btn = document.querySelector('.sidebar-toggle');
+            sb.classList.add('collapsed');
+            btn.innerText = '▶';
         }
     </script>
 </body>
