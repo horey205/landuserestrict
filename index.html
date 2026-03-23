@@ -27,8 +27,11 @@
             .sidebar { position: absolute; width: 85% !important; height: 100%; }
             .sidebar-toggle { width: 40px; height: 80px; left: 100%; top: 20%; transform: translateY(-20%); }
             .resizer { display: none !important; }
-            .ol-popup { min-width: 280px !important; width: 90vw !important; left: 50% !important; transform: translateX(-50%) !important; bottom: 100px !important; }
-            .ol-popup:after { left: 50% !important; }
+            .ol-popup { min-width: 250px !important; width: 85vw !important; left: 50% !important; transform: translateX(-50%) !important; bottom: 80px !important; padding: 12px 16px !important; border-radius: 20px !important; }
+            .ol-popup:after { left: 50% !important; display: none !important; } /* Hide arrow on mobile to save space */
+            .ol-popup h3 { font-size: 1.125rem !important; }
+            .ol-popup .py-3 { padding-top: 0.5rem !important; padding-bottom: 0.5rem !important; }
+            .ol-popup .pt-4 { padding-top: 0.5rem !important; }
             .map-controls-left { left: 1rem !important; right: 1rem !important; bottom: 1rem !important; width: auto !important; }
             .map-controls-right { right: 1rem !important; bottom: 8rem !important; }
             .change-base-group { flex-wrap: wrap; justify-content: center; }
@@ -379,33 +382,33 @@
                     const pyungPriceK = Math.round((jiga * 3.3058) / 1000).toLocaleString();
 
                     document.getElementById('popup-content').innerHTML = `
-                        <div class="space-y-4">
-                            <div class="flex justify-between items-center">
-                                <p class="text-[10px] text-emerald-400 font-black uppercase tracking-widest leading-none">Parcel Insight</p>
-                                <p class="text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-none">VWORLD PRO 1.5.1</p>
+                        <div class="space-y-3 md:space-y-4">
+                            <div class="flex justify-between items-center opacity-70">
+                                <p class="text-[8px] md:text-[10px] text-emerald-400 font-black uppercase tracking-widest leading-none">Parcel Insight</p>
+                                <p class="text-[8px] md:text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-none">VWORLD PRO 1.5.1</p>
                             </div>
-                            <div>
-                                <h3 class="text-xl font-black text-white leading-tight">${p.emd_nm || ''} ${p.jibun || ''}</h3>
-                                <div class="flex items-center gap-2 mt-3 text-xs font-bold text-slate-300">
-                                    <span class="bg-blue-600/30 text-blue-400 px-3 py-2 rounded-xl flex items-center justify-center min-w-[60px] text-center">${p.jimok || '-'}</span>
-                                    <div class="bg-slate-700/50 px-3 py-1.5 rounded-xl border border-slate-600/50 flex-1 leading-tight">
+                            <div class="flex justify-between items-start gap-4">
+                                <h3 class="text-base md:text-xl font-black text-white leading-tight">${p.emd_nm || ''} ${p.jibun || ''}</h3>
+                                <div class="flex items-center gap-1.5 text-[10px] md:text-xs font-bold text-slate-300">
+                                    <span class="bg-blue-600/30 text-blue-400 px-2 py-1 md:px-3 md:py-2 rounded-lg md:rounded-xl flex items-center justify-center min-w-[45px] md:min-w-[60px] text-center">${p.jimok || '-'}</span>
+                                    <div class="bg-slate-700/50 px-2 py-1 md:px-3 md:py-1.5 rounded-lg md:rounded-xl border border-slate-600/50 flex-1 leading-tight">
                                         <p>${area.toLocaleString()}㎡</p>
-                                        <p class="text-[10px] text-slate-500 font-medium">(${pyungArea}평)</p>
+                                        <p class="text-[8px] md:text-[10px] text-slate-500 font-medium">(${pyungArea}평)</p>
                                     </div>
                                 </div>
                             </div>
-                            <div class="py-3 px-4 bg-slate-800/50 rounded-2xl border border-white/5">
-                                <p class="text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1.5 font-bold">Land Use Regulation</p>
-                                <p class="text-[11px] font-bold text-slate-200 leading-snug">${regList}</p>
+                            <div class="py-2 px-3 md:py-3 md:px-4 bg-slate-800/50 rounded-xl md:rounded-2xl border border-white/5">
+                                <p class="text-[8px] md:text-[9px] text-slate-500 font-black uppercase tracking-widest mb-1 font-bold">Land Use Regulation</p>
+                                <p class="text-[10px] md:text-[11px] font-bold text-slate-200 leading-snug truncate md:whitespace-normal">${regList}</p>
                             </div>
-                            <div class="pt-4 border-t border-white/10 flex justify-between items-end">
+                            <div class="pt-2 md:pt-4 border-t border-white/10 flex justify-between items-end">
                                 <div>
-                                    <p class="text-[9px] text-slate-500 font-black uppercase tracking-tighter mb-1">1㎡ 가격 (천원)</p>
-                                    <p class="text-lg font-black text-yellow-500">${jiga > 0 ? jigaK + ' <span class="text-xs">천원</span>' : '정보 없음'}</p>
+                                    <p class="text-[8px] md:text-[9px] text-slate-400 font-black uppercase tracking-tighter mb-0.5">1㎡ (천원)</p>
+                                    <p class="text-base md:text-lg font-black text-yellow-500">${jiga > 0 ? jigaK + '<span class="text-[10px] opacity-70 ml-0.5">K</span>' : '정보 없음'}</p>
                                 </div>
                                 <div class="text-right">
-                                    <p class="text-[9px] text-slate-500 font-black uppercase tracking-tighter mb-1">평당 가격 (천원)</p>
-                                    <p class="text-lg font-black text-white">${jiga > 0 ? pyungPriceK + ' <span class="text-xs text-slate-400">천원</span>' : '-'}</p>
+                                    <p class="text-[8px] md:text-[9px] text-slate-400 font-black uppercase tracking-tighter mb-0.5">평당 (천원)</p>
+                                    <p class="text-base md:text-lg font-black text-white">${jiga > 0 ? pyungPriceK + '<span class="text-[10px] opacity-70 ml-0.5">K</span>' : '-'}</p>
                                 </div>
                             </div>
                         </div>
