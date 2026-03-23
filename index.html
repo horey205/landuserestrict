@@ -298,18 +298,23 @@
         }
 
         map.on('pointermove', (e) => {
-            if (e.dragging) return;
+            if (e.dragging || window.innerWidth <= 768) return; // Ignore on mobile or if dragging
             clearTimeout(hoverTimeout);
             hoverTimeout = setTimeout(() => {
                 const coord = ol.proj.toLonLat(e.coordinate);
-                handleHover(coord[0], coord[1], e.coordinate);
+                handleInsight(coord[0], coord[1], e.coordinate);
             }, 250);
         });
 
-        // Click only for solid highlight, no detail panel
+        // Click for both highlight and insight (essential for mobile)
         map.on('singleclick', async (e) => {
             const coord = ol.proj.toLonLat(e.coordinate);
             selectionLayer.getSource().clear();
+            
+            // Show detailed insight
+            handleInsight(coord[0], coord[1], e.coordinate);
+            
+            // Highlight parcel with solid color
             const res = await fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${coord[0]} ${coord[1]})&crs=EPSG:4326&domain=${window.location.hostname}`));
             const d = await res.json();
             if(d.response?.status === 'OK' && d.response.result.featureCollection.features.length > 0) {
@@ -317,8 +322,8 @@
             }
         });
 
-        async function handleHover(lon, lat, mapCoord) {
-            if (!layers.LxJibun.getVisible() || !isInsightActive || map.getView().getZoom() < 16) { 
+        async function handleInsight(lon, lat, mapCoord) {
+            if (!layers.LxJibun.getVisible() || !isInsightActive || map.getView().getZoom() < 14) { // Lower zoom threshold for mobile
                 overlay.setPosition(undefined); 
                 hoverLayer.getSource().clear();
                 return; 
