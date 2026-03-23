@@ -140,9 +140,10 @@
         // Smart Proxy: Auto-detect Environment (Local vs Vercel)
         const proxy = (url) => {
             const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            // Use local Python proxy for development, and hardened Node.js proxy for Vercel
-            const proxyBase = isLocal ? 'http://localhost:8000/proxy?url=' : '/api/proxy?url=';
-            return `${proxyBase}${encodeURIComponent(url)}`;
+            // Vercel deployment uses 'Path Rewrites' for high-performance proxying
+            if (!isLocal) return url.replace('https://api.vworld.kr/', '/vworld-query/');
+            // Local version uses Python proxy server
+            return `http://localhost:8000/proxy?url=${encodeURIComponent(url)}`;
         };
         
         let wfsLayers = [], favorites = [], hoverTimeout, isInsightActive = true;
