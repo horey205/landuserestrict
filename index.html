@@ -187,7 +187,7 @@
 
         async function search() {
             const q = document.getElementById('searchInput').value; if(!q) return;
-            const res = await fetch(proxy(`https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:4326&type=place&key=${API_KEY}&query=${encodeURIComponent(q)}&domain=${window.location.hostname}`));
+            const res = await fetch(proxy(`https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:4326&type=place&key=${API_KEY}&query=${encodeURIComponent(q)}&domain=${window.location.hostname}`, true));
             const d = await res.json();
             if(d.response?.status === 'OK') {
                 const itm = d.response.result.items[0].point;
@@ -197,7 +197,7 @@
 
         async function fetchCapabilities() {
             try {
-                const res = await fetch(proxy(`https://api.vworld.kr/req/wms?key=${API_KEY}&domain=${window.location.hostname}&service=WMS&version=1.3.0&request=GetCapabilities`));
+                const res = await fetch(proxy(`https://api.vworld.kr/req/wms?key=${API_KEY}&domain=${window.location.hostname}&service=WMS&version=1.3.0&request=GetCapabilities`, true));
                 const text = await res.text();
                 const xml = new DOMParser().parseFromString(text, 'text/xml');
                 const layersNode = xml.getElementsByTagName('Layer');
@@ -331,7 +331,7 @@
 
                         const fetches = [
                             p.pnu ? fetch(proxy(`https://api.vworld.kr/ned/wfs/getIndvdLandPriceWFS?service=WFS&version=1.1.0&request=GetFeature&typename=dt_d150&pnu=${p.pnu}&output=application/json&key=${API_KEY}&domain=${window.location.hostname}`, true)) : Promise.resolve(null),
-                            ...regLayers.map(layer => fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=${layer}&key=${API_KEY}&geomFilter=POINT(${lon} ${lat})&crs=EPSG:4326&domain=${window.location.hostname}`)))
+                            ...regLayers.map(layer => fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=${layer}&key=${API_KEY}&geomFilter=POINT(${lon} ${lat})&crs=EPSG:4326&domain=${window.location.hostname}`, true)))
                         ];
 
                         const responses = await Promise.all(fetches);
