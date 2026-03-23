@@ -138,12 +138,11 @@
         const API_KEY = '3283C4CC-DAD6-34EB-AE67-2430215D21AC';
         
         // Smart Proxy: Auto-detect Environment (Local vs Vercel)
-        const proxy = (url, forceProxy = false) => {
+        const proxy = (url) => {
             const isLocal = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            // Use local Python proxy for development, but call DIRECTLY on Vercel for better performance/reliability
-            if (!isLocal && !forceProxy) return url; 
-            const proxyBase = isLocal ? 'http://localhost:8000/proxy?url=' : '/api/proxy?url=';
-            return `${proxyBase}${encodeURIComponent(url)}`;
+            // Use local Python proxy for development, but call DIRECTLY on Vercel for maximum reliability
+            if (!isLocal) return url; 
+            return `http://localhost:8000/proxy?url=${encodeURIComponent(url)}`;
         };
         
         let wfsLayers = [], favorites = [], hoverTimeout, isInsightActive = true;
@@ -187,7 +186,7 @@
 
         async function search() {
             const q = document.getElementById('searchInput').value; if(!q) return;
-            const res = await fetch(proxy(`https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:4326&type=place&key=${API_KEY}&query=${encodeURIComponent(q)}&domain=${window.location.hostname}`, true));
+            const res = await fetch(proxy(`https://api.vworld.kr/req/search?service=search&request=search&version=2.0&crs=EPSG:4326&type=place&key=${API_KEY}&query=${encodeURIComponent(q)}&domain=${window.location.hostname}`));
             const d = await res.json();
             if(d.response?.status === 'OK') {
                 const itm = d.response.result.items[0].point;
@@ -197,7 +196,7 @@
 
         async function fetchCapabilities() {
             try {
-                const res = await fetch(proxy(`https://api.vworld.kr/req/wms?key=${API_KEY}&domain=${window.location.hostname}&service=WMS&version=1.3.0&request=GetCapabilities`, true));
+                const res = await fetch(proxy(`https://api.vworld.kr/req/wms?key=${API_KEY}&domain=${window.location.hostname}&service=WMS&version=1.3.0&request=GetCapabilities`));
                 const text = await res.text();
                 const xml = new DOMParser().parseFromString(text, 'text/xml');
                 const layersNode = xml.getElementsByTagName('Layer');
@@ -297,7 +296,7 @@
         map.on('singleclick', async (e) => {
             const coord = ol.proj.toLonLat(e.coordinate);
             selectionLayer.getSource().clear();
-            const res = await fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${coord[0]} ${coord[1]})&crs=EPSG:4326&domain=${window.location.hostname}`, true));
+            const res = await fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${coord[0]} ${coord[1]})&crs=EPSG:4326&domain=${window.location.hostname}`));
             const d = await res.json();
             if(d.response?.status === 'OK' && d.response.result.featureCollection.features.length > 0) {
                 selectionLayer.getSource().addFeatures(new ol.format.GeoJSON().readFeatures(d.response.result.featureCollection));
@@ -311,7 +310,7 @@
                 return; 
             }
             try {
-                const res = await fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${lon} ${lat})&crs=EPSG:4326&domain=${window.location.hostname}`, true));
+                const res = await fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${lon} ${lat})&crs=EPSG:4326&domain=${window.location.hostname}`));
                 const d = await res.json();
                 if (d.response?.status === 'OK' && d.response.result.featureCollection.features.length > 0) {
                     const p = d.response.result.featureCollection.features[0].properties;
@@ -330,8 +329,8 @@
                         ];
 
                         const fetches = [
-                            p.pnu ? fetch(proxy(`https://api.vworld.kr/ned/wfs/getIndvdLandPriceWFS?service=WFS&version=1.1.0&request=GetFeature&typename=dt_d150&pnu=${p.pnu}&output=application/json&key=${API_KEY}&domain=${window.location.hostname}`, true)) : Promise.resolve(null),
-                            ...regLayers.map(layer => fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=${layer}&key=${API_KEY}&geomFilter=POINT(${lon} ${lat})&crs=EPSG:4326&domain=${window.location.hostname}`, true)))
+                            p.pnu ? fetch(proxy(`https://api.vworld.kr/ned/wfs/getIndvdLandPriceWFS?service=WFS&version=1.1.0&request=GetFeature&typename=dt_d150&pnu=${p.pnu}&output=application/json&key=${API_KEY}&domain=${window.location.hostname}`)) : Promise.resolve(null),
+                            ...regLayers.map(layer => fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=${layer}&key=${API_KEY}&geomFilter=POINT(${lon} ${lat})&crs=EPSG:4326&domain=${window.location.hostname}`)))
                         ];
 
                         const responses = await Promise.all(fetches);
