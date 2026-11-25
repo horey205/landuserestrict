@@ -54,7 +54,7 @@
             left: -50%;
             transform: translateX(-50%);
             min-width: 240px;
-            pointer-events: none;
+            pointer-events: auto;
             box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.4);
             z-index: 1000;
             display: none;
@@ -76,6 +76,7 @@
 </head>
 <body class="flex h-screen overflow-hidden">
     <div id="popup" class="ol-popup">
+        <button id="popup-close" onclick="closePinnedPopup(event)" title="닫기" class="hidden absolute top-3 right-4 w-6 h-6 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white text-xs font-black flex items-center justify-center transition-all cursor-pointer">✕</button>
         <div id="popup-content"></div>
     </div>
 
@@ -167,7 +168,7 @@
             return `http://localhost:8000/proxy?url=${encodeURIComponent(url)}`;
         };
         
-        let wfsLayers = [], favorites = [], hoverTimeout, isInsightActive = true;
+        let wfsLayers = [], favorites = [], hoverTimeout, isInsightActive = true, isPopupPinned = false, insightRequestId = 0;
 
         const overlay = new ol.Overlay({ element: document.getElementById('popup'), autoPan: { animation: { duration: 250 } } });
 
@@ -305,22 +306,43 @@
             `).join('');
         }
 
+        function closePinnedPopup(e) {
+            if (e) e.stopPropagation();
+            isPopupPinned = false;
+            insightRequestId++;
+            document.getElementById('popup-close').classList.add('hidden');
+            selectionLayer.getSource().clear();
+            hoverLayer.getSource().clear();
+            overlay.setPosition(undefined);
+            document.getElementById('popup').style.display = 'none';
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && isPopupPinned) closePinnedPopup();
+        });
+
         map.on('pointermove', (e) => {
-            if (e.dragging || window.innerWidth <= 768) return; // Ignore on mobile or if dragging
+            if (e.dragging || window.innerWidth <= 768 || isPopupPinned) return; // Ignore on mobile, dragging, or when pinned
             clearTimeout(hoverTimeout);
             hoverTimeout = setTimeout(() => {
+                if (isPopupPinned) return;
                 const coord = ol.proj.toLonLat(e.coordinate);
-                handleInsight(coord[0], coord[1], e.coordinate);
+                handleInsight(coord[0], coord[1], e.coordinate, false);
             }, 250);
         });
 
         // Click for both highlight and insight (essential for mobile)
         map.on('singleclick', async (e) => {
+            clearTimeout(hoverTimeout);
             const coord = ol.proj.toLonLat(e.coordinate);
             selectionLayer.getSource().clear();
+            isPopupPinned = true; // Lock immediately before async fetches so hover cannot overwrite
             
-            // Show detailed insight
-            handleInsight(coord[0], coord[1], e.coordinate);
+            const hasParcel = await handleInsight(coord[0], coord[1], e.coordinate, true);
+            if (!hasParcel) {
+                closePinnedPopup();
+                return;
+            }
             
             // Highlight parcel with solid color
             const res = await fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${coord[0]} ${coord[1]})&crs=EPSG:4326&domain=${APP_DOMAIN}`));
@@ -330,15 +352,20 @@
             }
         });
 
-        async function handleInsight(lon, lat, mapCoord) {
+        async function handleInsight(lon, lat, mapCoord, pinOnSuccess = false) {
+            if (!pinOnSuccess && isPopupPinned) return false;
+            const reqId = ++insightRequestId;
             if (!layers.LxJibun.getVisible() || !isInsightActive || map.getView().getZoom() < 14) { // Lower zoom threshold for mobile
-                overlay.setPosition(undefined); 
-                hoverLayer.getSource().clear();
-                return; 
+                if (!isPopupPinned) {
+                    overlay.setPosition(undefined); 
+                    hoverLayer.getSource().clear();
+                }
+                return false; 
             }
             try {
                 const res = await fetch(proxy(`https://api.vworld.kr/req/data?service=data&request=GetFeature&data=LT_C_LANDINFOBASEMAP&key=${API_KEY}&geomFilter=POINT(${lon} ${lat})&crs=EPSG:4326&domain=${APP_DOMAIN}`));
                 const d = await res.json();
+                if (reqId !== insightRequestId || (!pinOnSuccess && isPopupPinned)) return false;
                 if (d.response?.status === 'OK' && d.response.result.featureCollection.features.length > 0) {
                     const p = d.response.result.featureCollection.features[0].properties;
                     console.log("DEBUG: LX Parcel Properties:", p);
@@ -365,6 +392,7 @@
                             if (item.status !== 'fulfilled' || !item.value || !item.value.ok) return null;
                             try { return await item.value.json(); } catch { return null; }
                         }));
+                        if (reqId !== insightRequestId || (!pinOnSuccess && isPopupPinned)) return false;
 
                         // Parse Land Price
                         if (results[0]) {
@@ -391,7 +419,7 @@
 
                     document.getElementById('popup-content').innerHTML = `
                         <div class="space-y-3 md:space-y-4">
-                            <div class="flex justify-between items-center opacity-70">
+                            <div class="flex justify-between items-center opacity-70 pr-7">
                                 <p class="text-[8px] md:text-[10px] text-emerald-400 font-black uppercase tracking-widest leading-none">Parcel Insight</p>
                                 <p class="text-[8px] md:text-[10px] text-slate-500 font-bold uppercase tracking-widest leading-none">VWORLD PRO 1.5.1</p>
                             </div>
@@ -423,12 +451,20 @@
                     `;
                     overlay.setPosition(mapCoord);
                     document.getElementById('popup').style.display = 'block';
+                    if (pinOnSuccess) {
+                        isPopupPinned = true;
+                        document.getElementById('popup-close').classList.remove('hidden');
+                    }
                     hoverLayer.getSource().clear();
                     hoverLayer.getSource().addFeatures(new ol.format.GeoJSON().readFeatures(d.response.result.featureCollection));
+                    return true;
                 } else {
-                    overlay.setPosition(undefined); document.getElementById('popup').style.display = 'none'; hoverLayer.getSource().clear();
+                    if (!isPopupPinned) {
+                        overlay.setPosition(undefined); document.getElementById('popup').style.display = 'none'; hoverLayer.getSource().clear();
+                    }
+                    return false;
                 }
-            } catch (e) { }
+            } catch (e) { return false; }
         }
 
         function goHome() { map.getView().animate({ center: ol.proj.fromLonLat([127.1704, 37.4495]), zoom: 17 }); }
@@ -449,8 +485,7 @@
                 btn.classList.replace('text-emerald-600', 'text-slate-500');
                 icon.innerText = '🙈';
                 label.innerText = '필지속성 OFF';
-                overlay.setPosition(undefined);
-                hoverLayer.getSource().clear();
+                closePinnedPopup();
             }
         }
 
