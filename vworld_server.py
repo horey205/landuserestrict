@@ -23,7 +23,12 @@ class VWorldProxyHandler(http.server.SimpleHTTPRequestHandler):
                 params = urllib.parse.parse_qs(parsed.query)
                 
                 target_url = params.get('url', [None])[0]
-                if not target_url: return
+                if not target_url:
+                    self.send_response(400)
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(b'Missing url parameter')
+                    return
 
                 # 2. OpenLayers가 붙인 나머지 파라미터들 수집
                 others = {k: v[0] for k, v in params.items() if k != 'url'}
@@ -41,7 +46,7 @@ class VWorldProxyHandler(http.server.SimpleHTTPRequestHandler):
                 target_url = target_url.replace(' ', '%20')
 
                 # DEBUG: 서버가 도대체 어디로 가려고 하는지 출력 (원인 분석용)
-                print(f"📡 Forwarding to: {target_url[:150]}...")
+                print(f"[*] Forwarding to: {target_url[:150]}...")
 
                 headers = {
                     'Referer': 'https://map.vworld.kr/',
@@ -52,18 +57,18 @@ class VWorldProxyHandler(http.server.SimpleHTTPRequestHandler):
                 req = urllib.request.Request(target_url, headers=headers)
                 with urllib.request.urlopen(req, context=ctx, timeout=10) as response:
                     self.send_response(200)
-                    self.send_header('Content-type', response.info().get_content_type())
+                    self.send_header('Content-type', response.headers.get('Content-Type', 'application/octet-stream'))
                     self.send_header('Access-Control-Allow-Origin', '*')
                     self.end_headers()
                     self.wfile.write(response.read())
             except urllib.error.HTTPError as e:
-                print(f"⚠️ VWorld API Error: {e.code} for {target_url[:50]}")
+                print(f"[WARN] VWorld API Error: {e.code} for {target_url[:50]}")
                 self.send_response(e.code)
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(str(e.reason).encode())
             except Exception as e:
-                print(f"❌ Proxy Critical Error: {e}")
+                print(f"[ERROR] Proxy Critical Error: {e}")
                 self.send_response(500)
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
@@ -75,5 +80,5 @@ class VWorldProxyHandler(http.server.SimpleHTTPRequestHandler):
 if __name__ == "__main__":
     socketserver.TCPServer.allow_reuse_address = True
     with ThreadedHTTPServer(("", PORT), VWorldProxyHandler) as httpd:
-        print(f"🚀 Auto-Repair Server started at http://localhost:{PORT}")
+        print(f"[OK] Auto-Repair Server started at http://localhost:{PORT}")
         httpd.serve_forever()
